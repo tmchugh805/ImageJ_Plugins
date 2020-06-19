@@ -48,8 +48,6 @@ String filename;
             IJ.run(imp, "Enhance Contrast", "saturated=0.35");
         }
 
-        String pathName = IJ.getDirectory("current");
-        new File(pathName+filename).mkdir();
 
     }
 
