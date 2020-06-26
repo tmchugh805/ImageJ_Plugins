@@ -210,7 +210,6 @@ public class Linescan_Intensity_Profile implements ExtendedPlugInFilter, DialogL
         }
         start.addAll(end);
         int [] output = start.stream().mapToInt(Integer::intValue).toArray();
-        IJ.log(Arrays.toString(output));
         return output;
     }
 
