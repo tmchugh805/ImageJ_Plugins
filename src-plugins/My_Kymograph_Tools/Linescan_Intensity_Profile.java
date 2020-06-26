@@ -92,8 +92,8 @@ public class Linescan_Intensity_Profile implements ExtendedPlugInFilter, DialogL
 
         if (gd.wasOKed()) {
             IJ.log("GD was Oked");
-            Roi[] roiArray = roiManager.getRoisAsArray();
-            Roi[] trimmedRoiArray = Arrays.copyOfRange(roiArray,roiArray.length/2,roiArray.length-1);
+            Roi[] roiNewArray = roiManager.getRoisAsArray();
+            Roi[] trimmedRoiArray = Arrays.copyOfRange(roiNewArray,0,roiNewArray.length - roiArray.length);
             IJ.log("Number of ROIs: "+ trimmedRoiArray.length);
             profilesToFile(trimmedRoiArray, fileNameList);
         }
@@ -125,9 +125,15 @@ public class Linescan_Intensity_Profile implements ExtendedPlugInFilter, DialogL
         if (roiManager.getCount() != 0) {
             roiManager.runCommand("Delete");
         }
-        for (Roi roIs : trimmedRoiArray) {
-            roIs.setStrokeWidth(3);
-            roiManager.addRoi(roIs);
+
+        for (int i =0; i < trimmedRoiArray.length; i++) {
+            trimmedRoiArray[i].setStrokeWidth(3);
+            if (i%2 ==0){
+                trimmedRoiArray[i].setStrokeColor(Color.red);
+            }else {
+                trimmedRoiArray[i].setStrokeColor(Color.blue);
+            }
+            roiManager.addRoi(trimmedRoiArray[i]);
         }
         roiManager.runCommand(microtubuleImage, "Show All without labels");
         for (Roi roIs : roiArray) {
@@ -145,16 +151,27 @@ public class Linescan_Intensity_Profile implements ExtendedPlugInFilter, DialogL
             microtubuleImage.setRoi(points);
             ProfilePlot profilePlot = new ProfilePlot(microtubuleImage);
             double[] profile = profilePlot.getProfile();
-            int[] startAndEnd = getStartAndEnds(profile, threshold);
-            //Find the start and end point of the microtubule
 
-            //int[] startAndEnd = getStartAndEnd(profile, threshold);
-            int subROIs = startAndEnd.length / 2;
+            //Find the start and end point of the microtubule
+            int[] startAndEnd = getStartAndEnds(profile, threshold);
+            int nSubROIs = startAndEnd.length / 2;
             //plot the ROI on the microtubule image
+            double angle = points.getAngle();
             Point[] point = points.getContainedPoints();
-            for (int j = 0; j < subROIs; j++) {
-                Line trimmedRoi = new Line(point[startAndEnd[j]].x, point[startAndEnd[j]].y, point[startAndEnd[subROIs + j]].x, point[startAndEnd[subROIs + j]].y);
+            int pointA;
+            int pointB;
+            for (int j = 0; j < nSubROIs; j++) {
+                if (angle>0){
+                    pointA = nSubROIs + j;
+                    pointB = j;
+                }else {
+                    pointA = j;
+                    pointB = nSubROIs +j;
+                }
+                Line trimmedRoi = new Line(point[startAndEnd[pointA]].x, point[startAndEnd[pointA]].y,
+                        point[startAndEnd[pointB]].x, point[startAndEnd[pointB]].y);
                 trimmedList.add(trimmedRoi);
+                IJ.log(point[startAndEnd[j]].x +" " + point[startAndEnd[nSubROIs + j]].x);
             }
         }
         return trimmedList.toArray(new Roi[0]);
@@ -165,11 +182,11 @@ public class Linescan_Intensity_Profile implements ExtendedPlugInFilter, DialogL
         List<Integer> start = new ArrayList<>();
         List<Integer> end = new ArrayList<>();
         boolean isMT = false;
-        int j = 0;
+        int j = 1;
         while(j<profile.length){
             if(profile[j] >= threshold && !isMT){
                 isMT = true;
-                start.add(j);
+                start.add(j-1);
             }
             if (profile[j] < threshold && isMT){
                 isMT = false;
@@ -182,31 +199,10 @@ public class Linescan_Intensity_Profile implements ExtendedPlugInFilter, DialogL
         }
         start.addAll(end);
         int [] output = start.stream().mapToInt(Integer::intValue).toArray();
-
         IJ.log(Arrays.toString(output));
-
         return output;
     }
 
-    public int[] getStartAndEnd(double[] profile, double threshold) {
-        int start = 0;
-        int j = 0;
-        int n = 0;
-        while (start == 0 && j < profile.length) {
-            if (profile[j] > threshold) {
-                start=j;
-            }
-            j++;
-        }
-        int end = 0;
-        while (end == 0 && j < profile.length) {
-            if (profile[j] < threshold) {
-                end = j;
-            }
-            j++;
-        }
-        return new int[]{start, end};
-    }
 
     public Roi[] makeROIs() {
 
