@@ -157,22 +157,23 @@ public class Linescan_Intensity_Profile implements ExtendedPlugInFilter, DialogL
             int nSubROIs = startAndEnd.length / 2;
             //plot the ROI on the microtubule image
             double angle = points.getAngle();
+            IJ.log("Angle: " +angle);
             Point[] point = points.getContainedPoints();
             int pointA;
             int pointB;
             for (int j = 0; j < nSubROIs; j++) {
+                pointA = startAndEnd[j];
+                pointB = startAndEnd[nSubROIs +j];
                 if (angle>0){
-                    pointA = nSubROIs + j;
-                    pointB = j;
-                }else {
-                    pointA = j;
-                    pointB = nSubROIs +j;
+                    pointA = point.length -pointA;
+                    pointB = point.length -pointB;
                 }
-                Line trimmedRoi = new Line(point[startAndEnd[pointA]].x, point[startAndEnd[pointA]].y,
-                        point[startAndEnd[pointB]].x, point[startAndEnd[pointB]].y);
+                Line trimmedRoi = new Line(point[pointA].x, point[pointA].y,
+                        point[pointB].x, point[pointB].y);
                 trimmedList.add(trimmedRoi);
-                IJ.log(point[startAndEnd[j]].x +" " + point[startAndEnd[nSubROIs + j]].x);
+                IJ.log("Length: "+trimmedRoi.getRawLength());
             }
+
         }
         return trimmedList.toArray(new Roi[0]);
     }
