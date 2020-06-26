@@ -5,6 +5,7 @@ import ij.IJ;
 import ij.ImagePlus;
 import ij.WindowManager;
 import ij.gui.GenericDialog;
+import ij.gui.NonBlockingGenericDialog;
 import ij.gui.Roi;
 import ij.gui.WaitForUserDialog;
 import ij.io.ImageReader;
@@ -196,7 +197,7 @@ public class MultiColour_Kymograph implements PlugIn {
 
     public Roi[]  makeNewROIs(List <String> filenameList){
 
-        GenericDialog channelDialog = new GenericDialog("Reference Channel Selector");
+        GenericDialog channelDialog = new NonBlockingGenericDialog("Reference Channel Selector");
         String[] filenameArray = filenameList.toArray(new String[0]);
         channelDialog.addChoice("Reference Channel", filenameArray,filenameArray[0]);
         channelDialog.showDialog();
@@ -251,7 +252,7 @@ public class MultiColour_Kymograph implements PlugIn {
     // string[7] array of these choices.
 
     public String[] channelSelector(List <String> filenameList){
-        GenericDialog channelDialog = new GenericDialog("Channel Selector");
+        GenericDialog channelDialog = new NonBlockingGenericDialog("Channel Selector");
         int n = filenameList.size();
         filenameList.add("--");
         String[] filenameArray = filenameList.toArray(new String[0]);
