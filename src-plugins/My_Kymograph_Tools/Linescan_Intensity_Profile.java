@@ -138,32 +138,63 @@ public class Linescan_Intensity_Profile implements ExtendedPlugInFilter, DialogL
 
     public Roi[] getThresholdedROIs(double threshold, Roi[] roiArray, ImagePlus microtubuleImage) {
 
-        Roi[] trimmedArray = new Roi[roiArray.length];
+        List<Roi> trimmedList = new ArrayList<>();
 
-        for (int i = 0; i < roiArray.length; i++) {
+        for (Roi points : roiArray) {
             //Get the intensity profile along microtubules
-            microtubuleImage.setRoi(roiArray[i]);
+            microtubuleImage.setRoi(points);
             ProfilePlot profilePlot = new ProfilePlot(microtubuleImage);
             double[] profile = profilePlot.getProfile();
-
+            int[] startAndEnd = getStartAndEnds(profile, threshold);
             //Find the start and end point of the microtubule
-            int[] startAndEnd = getStartAndEnd(profile, threshold);
 
+            //int[] startAndEnd = getStartAndEnd(profile, threshold);
+            int subROIs = startAndEnd.length / 2;
             //plot the ROI on the microtubule image
-            Point[] point = roiArray[i].getContainedPoints();
-            Line trimmedRoi = new Line(point[startAndEnd[0]].x, point[startAndEnd[0]].y, point[startAndEnd[1]].x, point[startAndEnd[1]].y);
-            trimmedArray[i] = trimmedRoi;
-
+            Point[] point = points.getContainedPoints();
+            for (int j = 0; j < subROIs; j++) {
+                Line trimmedRoi = new Line(point[startAndEnd[j]].x, point[startAndEnd[j]].y, point[startAndEnd[subROIs + j]].x, point[startAndEnd[subROIs + j]].y);
+                trimmedList.add(trimmedRoi);
+            }
         }
-        return trimmedArray;
+        return trimmedList.toArray(new Roi[0]);
+    }
+
+
+    public int[] getStartAndEnds(double[] profile, double threshold) {
+        List<Integer> start = new ArrayList<>();
+        List<Integer> end = new ArrayList<>();
+        boolean isMT = false;
+        int j = 0;
+        while(j<profile.length){
+            if(profile[j] >= threshold && !isMT){
+                isMT = true;
+                start.add(j);
+            }
+            if (profile[j] < threshold && isMT){
+                isMT = false;
+                end.add(j);
+            }
+            j++;
+        }
+        if (start.size()!=end.size()){
+            start.remove(start.size()-1);
+        }
+        start.addAll(end);
+        int [] output = start.stream().mapToInt(Integer::intValue).toArray();
+
+        IJ.log(Arrays.toString(output));
+
+        return output;
     }
 
     public int[] getStartAndEnd(double[] profile, double threshold) {
         int start = 0;
         int j = 0;
+        int n = 0;
         while (start == 0 && j < profile.length) {
             if (profile[j] > threshold) {
-                start = j;
+                start=j;
             }
             j++;
         }
