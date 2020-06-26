@@ -93,6 +93,7 @@ public class Linescan_Intensity_Profile implements ExtendedPlugInFilter, DialogL
         if (gd.wasCanceled())      // dialog cancelled?
             return DONE;
 
+
         if (gd.wasOKed()) {
             IJ.log("GD was Oked");
             IJ.log("threshold: "+threshold);
