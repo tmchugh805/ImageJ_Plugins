@@ -40,7 +40,7 @@ public class Linescan_Intensity_Profile implements ExtendedPlugInFilter, DialogL
     private String filename;
     private String directory;
     private RoiManager roiManager;
-
+    private boolean[] includeChannel;
     /**
      * This method is called by ImageJ for initialization.
      *
@@ -74,6 +74,9 @@ public class Linescan_Intensity_Profile implements ExtendedPlugInFilter, DialogL
         directory = IJ.getDirectory("current");
         filename = WindowManager.getCurrentImage().getShortTitle();//Count number of open windows (channels)
         String[] fileNameList = channelSelector(channelTitles);
+        if (fileNameList[0] == null){
+            return DONE;
+        }
         new WaitForUserDialog("Select", "Select the reference channel").show();
         microtubuleImage = WindowManager.getCurrentImage();
 
@@ -92,7 +95,15 @@ public class Linescan_Intensity_Profile implements ExtendedPlugInFilter, DialogL
 
         if (gd.wasOKed()) {
             IJ.log("GD was Oked");
+            IJ.log("threshold: "+threshold);
+            IJ.log("Selected Channels:");
+            for (int i = 0; i < fileNameList.length; i++){
+                if(includeChannel[i]){
+                    IJ.log(fileNameList[i]);
+                }
+            }
             Roi[] roiNewArray = roiManager.getRoisAsArray();
+
             Roi[] trimmedRoiArray = Arrays.copyOfRange(roiNewArray,0,roiNewArray.length - roiArray.length);
             IJ.log("Number of ROIs: "+ trimmedRoiArray.length);
             profilesToFile(trimmedRoiArray, fileNameList);
@@ -121,7 +132,6 @@ public class Linescan_Intensity_Profile implements ExtendedPlugInFilter, DialogL
 
     private void thresholdROIs( double threshold, ImagePlus microtubuleImage) {
         Roi[] trimmedRoiArray = getThresholdedROIs(threshold, roiArray, microtubuleImage);
-        IJ.log("threshold: "+threshold);
         if (roiManager.getCount() != 0) {
             roiManager.runCommand("Delete");
         }
@@ -157,7 +167,6 @@ public class Linescan_Intensity_Profile implements ExtendedPlugInFilter, DialogL
             int nSubROIs = startAndEnd.length / 2;
             //plot the ROI on the microtubule image
             double angle = points.getAngle();
-            IJ.log("Angle: " +angle);
             Point[] point = points.getContainedPoints();
             int pointA;
             int pointB;
@@ -170,10 +179,10 @@ public class Linescan_Intensity_Profile implements ExtendedPlugInFilter, DialogL
                 }
                 Line trimmedRoi = new Line(point[pointA].x, point[pointA].y,
                         point[pointB].x, point[pointB].y);
+                if (trimmedRoi.getRawLength()>5){
                 trimmedList.add(trimmedRoi);
-                IJ.log("Length: "+trimmedRoi.getRawLength());
+                }
             }
-
         }
         return trimmedList.toArray(new Roi[0]);
     }
@@ -220,16 +229,25 @@ public class Linescan_Intensity_Profile implements ExtendedPlugInFilter, DialogL
     public String[] channelSelector(String[] filenameArray){
         GenericDialog channelDialog = new NonBlockingGenericDialog("Rename Channels");
         int n = filenameArray.length;
+        includeChannel = new boolean[n];
         for (String s : filenameArray) {
-            channelDialog.addStringField("New Title for " + s, " ");
+            channelDialog.setInsets(5,0,0);
+            channelDialog.addStringField(s, " ");
+            channelDialog.setInsets(-5,0,5);
+            channelDialog.addCheckbox("Include Channel?", true);
         }
         channelDialog.showDialog();
+        if (channelDialog.wasCanceled()) {     // dialog cancelled?
+            return new String[]{null};
+        }
         for (int j = 0; j < n; j++) {
             String imageTitle = channelDialog.getNextString();
+            includeChannel[j] = channelDialog.getNextBoolean();
             ImagePlus newChannel = WindowManager.getImage(filenameArray[j]);
             newChannel.setTitle(imageTitle);
             filenameArray[j] = imageTitle;
         }
+
         return filenameArray;
     }
 
@@ -252,22 +270,25 @@ public class Linescan_Intensity_Profile implements ExtendedPlugInFilter, DialogL
         writeLineToFile(CreateName, "Reference Channel: "+microtubuleImage.getTitle(), false);
         writeLineToFile(CreateName, "Channels:",false);
 
-        for (String s : fileNameList) {
-            writeLineToFile(CreateName, s, false);
+        for (int i = 0; i < fileNameList.length; i++) {
+            if(includeChannel[i]) {
+                writeLineToFile(CreateName, fileNameList[i], false);
+            }
         }
 
 
-        for (String s : fileNameList) {
-            writeLineToFile(CreateName, "Channel: " + s, true);
+        for (int i = 0; i < fileNameList.length; i++) {
+            if(includeChannel[i]) {
+                writeLineToFile(CreateName, "Channel: " + fileNameList[i], true);
 
-            for (Roi points : trimmedRoiArray) {
-                ImagePlus channel = WindowManager.getImage(s);
-                channel.setRoi(points);
-                ProfilePlot profilePlot = new ProfilePlot(channel);
-                double[] profile = profilePlot.getProfile();
-                writeLineToFile(CreateName, profile);
+                for (Roi points : trimmedRoiArray) {
+                    ImagePlus channel = WindowManager.getImage(fileNameList[i]);
+                    channel.setRoi(points);
+                    ProfilePlot profilePlot = new ProfilePlot(channel);
+                    double[] profile = profilePlot.getProfile();
+                    writeLineToFile(CreateName, profile);
+                }
             }
-
         }
     }
 
