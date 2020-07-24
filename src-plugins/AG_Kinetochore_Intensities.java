@@ -78,16 +78,13 @@ public class AG_Kinetochore_Intensities implements PlugIn{
             referenceImage.setZ((int) slice[i]);
             roiArray[i] = new OvalRoi(roiData[0]-4, roiData[1]-4, width, height);
             roiArray[i].setPosition((int) slice[i]);
-          //  outputList.add(roiData);
         }
         while(roiManager.getCount()!=0){
             roiManager.runCommand("Delete");
         }
 
-
         for (String value : fileNameList) {
             Roi[] newRois = new Roi[roiArray.length];
-           // if (!value.equalsIgnoreCase(referenceImage.getShortTitle())) {
                 IJ.log(value);
                 ImagePlus image = WindowManager.getImage(value);
                 WindowManager.setWindow(new ImageWindow(image));
@@ -115,7 +112,6 @@ public class AG_Kinetochore_Intensities implements PlugIn{
                     while (roiManager.getCount() != 0) {
                         roiManager.runCommand("Delete");
                     }
-                //}
             }
         }
 
@@ -133,17 +129,13 @@ public class AG_Kinetochore_Intensities implements PlugIn{
                 Point[] points = backgroundArray[j].getContainedPoints();
                 backgroundData[0] = points[0].x;
                 backgroundData[1] = points[0].y;
+                image.setSlice(backgroundArray[j].getPosition());
                 double width = 8;
                 double height = 8;
                 backgroundData[2] = -1;
                 backgroundArray[j] = new OvalRoi(backgroundData[0] - 4, backgroundData[1] - 4, width, height);
-                double background = 0;
-                for (int k = 0; k < image.getNSlices(); k++) {
-                    image.setSlice(k);
-                    image.setRoi(backgroundArray[j]);
-                    background = background + image.getStatistics().mean;
-                }
-                backgroundData[3] = background / image.getNSlices();
+                image.setRoi(backgroundArray[j]);
+                backgroundData[3] = image.getStatistics().mean;
                 backgroundList.add(backgroundData);
             }
         }
@@ -191,9 +183,6 @@ public class AG_Kinetochore_Intensities implements PlugIn{
 
     private String makeResultsFile(List<double[]> outputList, List<double[]> backgroundList, String directory){
 
-        List<double[]> xPostions = separateChannels(0,outputList);
-        List<double[]> yPostions = separateChannels(1,outputList);
-        List<double[]> zPostions = separateChannels(2,outputList);
         List<double[]> intensities = separateChannels(3,outputList);
         double[] backgrounds = getBackgrounds(3,backgroundList);
 
