@@ -34,10 +34,9 @@ public class AG_Kinetochore_Intensities implements PlugIn{
         IJ.run("Bio-Formats Importer");// Open new file
         String[] channelTitles = WindowManager.getImageTitles();
         //Crop Images
-        directory = IJ.getDirectory("current");
         filename = WindowManager.getCurrentImage().getShortTitle();//Count number of open windows (channels)
         fileNameList = channelSelector(channelTitles);
-
+        directory = createNewFolder();
 
         new WaitForUserDialog("Select", "Select the reference channel").show();
         referenceImage = WindowManager.getCurrentImage();
@@ -50,7 +49,12 @@ public class AG_Kinetochore_Intensities implements PlugIn{
             IJ.run(imp, "Crop", "");
             IJ.run(imp, "Enhance Contrast", "saturated=0.35");
         }
-
+        for (int i = 0; i < fileNameList.length; i++) {
+            ImagePlus imp = WindowManager.getImage(fileNameList[i]);
+            String imageFilename = Paths.get(directory, fileNameList[i]).toString();
+            IJ.saveAs(imp,"Tiff",imageFilename);
+            imp.setTitle(fileNameList[i]);
+        }
         IJ.setTool("point");
 
         while (roiManager.getCount() != 0) {
@@ -85,7 +89,6 @@ public class AG_Kinetochore_Intensities implements PlugIn{
 
         for (String value : fileNameList) {
             Roi[] newRois = new Roi[roiArray.length];
-                IJ.log(value);
                 ImagePlus image = WindowManager.getImage(value);
                 WindowManager.setWindow(new ImageWindow(image));
                 image.setSlice((int) slice[0]);
@@ -96,8 +99,6 @@ public class AG_Kinetochore_Intensities implements PlugIn{
                     image.setSlice((int) slice[j]);
                     image.setRoi(roiArray[j]);
                     new WaitForUserDialog("Correct ROI and press OK").show();
-
-                    IJ.log("Z-Slice: " + image.getSlice() + " Mean: " + image.getStatistics().mean);
                     if(roiManager.getCount()==0) {
                         newRois[j] = roiArray[j];
                     }else {
@@ -113,11 +114,20 @@ public class AG_Kinetochore_Intensities implements PlugIn{
                         roiManager.runCommand("Delete");
                     }
             }
+                for (int i = 0 ; i< newRois.length; i++){
+                roiManager.addRoi(newRois[i]);
+                }
+             String roiFilename = Paths.get(directory, value+".zip").toString();
+            roiManager.runCommand("Save", roiFilename);
         }
 
+        while (roiManager.getCount() != 0) {
+            roiManager.runCommand("Delete");
+        }
         IJ.setTool("point");
         List<double[]>backgroundList = new ArrayList<>();
-        new WaitForUserDialog("Select background Rois and press 'T' to add to ROI manager").show();
+        createComposite();
+        new WaitForUserDialog("Select background Rois on composite image and press 'T' to add to ROI manager").show();
         Roi[] backgroundArray = roiManager.getRoisAsArray();
         for (String value : fileNameList) {
             ImagePlus image = WindowManager.getImage(value);
@@ -138,22 +148,68 @@ public class AG_Kinetochore_Intensities implements PlugIn{
                 backgroundData[3] = image.getStatistics().mean;
                 backgroundList.add(backgroundData);
             }
+            String roiFilename = Paths.get(directory, "background.zip").toString();
+            roiManager.runCommand("Save", roiFilename);
         }
 
-        for (double[] out : outputList) {
-            IJ.log( "A: " + out[3]);
+        String resultsFileName = makeResultsFile(outputList,backgroundList,"Mean_Intensities");
+        String resultsXYZFileName = makeResultsFileXYZ(outputList);
+
+        IJ.log("Files saved in: "+directory);
+
+    }
+
+    private void createComposite(){
+        String mergeString = "";
+        for (int i = 0; i < fileNameList.length;i++){
+            String newString = "c"+(i+1)+"="+fileNameList[i]+" ";
+            mergeString=mergeString.concat(newString);
         }
-        for (double[] back : backgroundList) {
-            IJ.log( "B: " + back[3]);
+        mergeString= mergeString.concat(" create keep");
+        IJ.run(referenceImage, "Merge Channels...", mergeString);
+    }
+
+    public boolean makeYesNoDialog(String title, String message) {
+        GenericDialog openSavedROIs = new GenericDialog(title);
+        openSavedROIs.addMessage(message);
+        openSavedROIs.enableYesNoCancel();
+        openSavedROIs.hideCancelButton();
+        openSavedROIs.showDialog();
+        return openSavedROIs.wasOKed();
+    }
+    private String createNewFolder(){
+
+        boolean makeNewFolder = makeYesNoDialog("New Folder", "Save in current directory?");
+        String baseDirectory = new String();
+        if(makeNewFolder) {
+             baseDirectory = IJ.getDirectory("current");
+        }else{
+            new WaitForUserDialog("Select directory to save.").show();
+            baseDirectory = IJ.getDirectory("");
         }
-
-
-        String baseDirectory = IJ.getDirectory("");
-        String resultsFileName = makeResultsFile(outputList,backgroundList,baseDirectory);
-        String resultsXYZFileName = makeResultsFileXYZ(outputList,baseDirectory);
-
-        IJ.log("Filename: "+resultsFileName);
-
+        GenericDialog channelDialog = new NonBlockingGenericDialog("Filename");
+        channelDialog.addStringField("Folder name:", filename);
+        channelDialog.showDialog();
+        String newFolder = channelDialog.getNextString();
+        String newDirectory = baseDirectory+newFolder;
+        File tmpDir = new File(newDirectory);
+        String filePath = Paths.get(baseDirectory, newFolder).toString();
+        //If the folder already exists gives options to overwrite or use directory to select a different folder.
+        if (tmpDir.exists()){
+            boolean makeNewDirectory = makeYesNoDialog("Folder already exists", "Folder "+ newDirectory+ " already exists and will be overwritten. Make new Folder?");
+            if (makeNewDirectory){
+                filePath = IJ.getDirectory("");
+            }else{
+                String[] entries = tmpDir.list();
+                for(String s: entries){
+                    File currentFile = new File(tmpDir.getPath(),s);
+                    currentFile.delete();
+                }
+            }
+        }else {
+            new File(newDirectory).mkdir();
+        }
+        return filePath;
     }
 
     private List<double[]> separateChannels(int column, List<double[]> outputList){
@@ -181,7 +237,7 @@ public class AG_Kinetochore_Intensities implements PlugIn{
         return backgroundMean;
     }
 
-    private String makeResultsFile(List<double[]> outputList, List<double[]> backgroundList, String directory){
+    private String makeResultsFile(List<double[]> outputList, List<double[]> backgroundList, String filename){
 
         List<double[]> intensities = separateChannels(3,outputList);
         double[] backgrounds = getBackgrounds(3,backgroundList);
@@ -244,18 +300,18 @@ public class AG_Kinetochore_Intensities implements PlugIn{
         return CreateName;
     }
 
-    private String makeResultsFileXYZ(List<double[]> outputList, String directory){
+    private String makeResultsFileXYZ(List<double[]> outputList){
 
         List<double[]> xPostions = separateChannels(0,outputList);
         List<double[]> yPostions = separateChannels(1,outputList);
         List<double[]> zPostions = separateChannels(2,outputList);
 
-        String CreateName = Paths.get( directory , filename+"XYZ.txt").toString();
+        String CreateName = Paths.get( directory , "XYZ_coordinates.txt").toString();
         File resultsFile = new File(CreateName);
         int nfiles = fileNameList.length;
         int i = 1;
         while (resultsFile.exists()){
-            CreateName= Paths.get( directory , filename+"_"+i+"XYZ.txt").toString();
+            CreateName= Paths.get( directory , "XYZ_coordinates_"+i+".txt").toString();
             resultsFile = new File(CreateName);
             IJ.log(CreateName);
             i++;
